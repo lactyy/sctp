@@ -82,7 +82,7 @@ func (p *packet) unmarshal(doChecksum bool, raw []byte) error {
 		default:
 		}
 	}
-	theirChecksum := binary.LittleEndian.Uint32(raw[8:])
+	theirChecksum := binary.BigEndian.Uint32(raw[8:])
 	if theirChecksum != 0 || doChecksum {
 		ourChecksum := generatePacketChecksum(raw)
 		if theirChecksum != ourChecksum {
@@ -178,7 +178,7 @@ func (p *packet) marshal(doChecksum bool) ([]byte, error) {
 		//
 		// Use LittleEndian.PutUint32 to avoid flipping the bytes in to
 		// the spec compliant checksum order
-		binary.LittleEndian.PutUint32(raw[8:], generatePacketChecksum(raw))
+		binary.BigEndian.PutUint32(raw[8:], generatePacketChecksum(raw))
 	}
 
 	return raw, nil
