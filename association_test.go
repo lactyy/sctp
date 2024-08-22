@@ -3222,6 +3222,10 @@ func TestAssociation_Abort(t *testing.T) {
 
 // TestAssociation_createClientWithContext tests that the client is closed when the context is canceled.
 func TestAssociation_createClientWithContext(t *testing.T) {
+	// Limit runtime in case of deadlocks
+	lim := test.TimeOut(time.Second * 5)
+	defer lim.Stop()
+
 	checkGoroutineLeaks(t)
 
 	udp1, udp2 := createUDPConnPair()
@@ -3454,4 +3458,45 @@ func TestAssociation_ReconfigRequestsLimited(t *testing.T) {
 
 	require.NoError(t, a1.Close())
 	require.NoError(t, a2.Close())
+}
+
+func TestAssociation_OpenStreamAfterClose(t *testing.T) {
+	checkGoroutineLeaks(t)
+
+	a1, a2, err := createAssocs()
+	require.NoError(t, err)
+
+	require.NoError(t, a1.Close())
+	require.NoError(t, a2.Close())
+
+	_, err = a1.OpenStream(1, PayloadTypeWebRTCString)
+	require.ErrorIs(t, err, ErrAssociationClosed)
+
+	_, err = a2.OpenStream(1, PayloadTypeWebRTCString)
+	require.ErrorIs(t, err, ErrAssociationClosed)
+}
+
+// https://github.com/pion/sctp/pull/350
+// may need to run with a high test count to reproduce if there
+// is ever a regression.
+func TestAssociation_OpenStreamAfterInternalClose(t *testing.T) {
+	checkGoroutineLeaks(t)
+
+	a1, a2, err := createAssocs()
+	require.NoError(t, err)
+
+	require.NoError(t, a1.netConn.Close())
+	require.NoError(t, a2.netConn.Close())
+
+	_, err = a1.OpenStream(1, PayloadTypeWebRTCString)
+	require.NoError(t, err)
+
+	_, err = a2.OpenStream(1, PayloadTypeWebRTCString)
+	require.NoError(t, err)
+
+	require.NoError(t, a1.Close())
+	require.NoError(t, a2.Close())
+
+	require.Equal(t, 0, len(a1.streams))
+	require.Equal(t, 0, len(a2.streams))
 }
